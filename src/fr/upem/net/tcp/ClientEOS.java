@@ -39,12 +39,13 @@ public class ClientEOS {
 		sc.shutdownOutput();
 
 		ByteBuffer recieveBuff = ByteBuffer.allocate(bufferSize);
-
-		while (sc.read(recieveBuff) != -1) {
-			if (!recieveBuff.hasRemaining()) {
-				break;
-			}
-		}
+		
+		readFully(sc,recieveBuff);
+//		while (sc.read(recieveBuff) != -1) {
+//			if (!recieveBuff.hasRemaining()) {
+//				break;
+//			}
+//		}
 		sc.close();
 		recieveBuff.flip();
 		return UTF8_CHARSET.decode(recieveBuff).toString();
@@ -65,28 +66,28 @@ public class ClientEOS {
 
 	public static String getUnboundedResponse(String request, SocketAddress server) throws IOException {
 
-		SocketChannel sc = SocketChannel.open();
-		sc.connect(server);
-		ByteBuffer snedBuffer = ByteBuffer.allocate(BUFFER_SIZE);
-		snedBuffer.put(UTF8_CHARSET.encode(request));
-		snedBuffer.flip();
-		sc.write(snedBuffer);
-		sc.shutdownOutput();
-		var currentBuffSize = BUFFER_SIZE;
-		ByteBuffer recieveBuff = ByteBuffer.allocate(currentBuffSize);
+		try(SocketChannel sc = SocketChannel.open()){
+			//sc.connect(server); il faut pas faire connect ??
+			sc.write(UTF8_CHARSET.encode(request));
+			sc.shutdownOutput();
+			
+			var currentBuffSize = BUFFER_SIZE;
+			ByteBuffer recieveBuff = ByteBuffer.allocate(currentBuffSize);
 
-		while (sc.read(recieveBuff) != -1) {
-			if (!recieveBuff.hasRemaining()) {
-				currentBuffSize *= 2;
-				ByteBuffer tmp = ByteBuffer.allocate(currentBuffSize);
-				recieveBuff.flip();
-				tmp.put(recieveBuff);
-				recieveBuff = tmp;
+			while (true) {
+				if(!readFully(sc, recieveBuff)) {
+					break;
+				}else {
+					currentBuffSize *= 2;
+					ByteBuffer tmp = ByteBuffer.allocate(currentBuffSize);
+					recieveBuff.flip();
+					tmp.put(recieveBuff);
+					recieveBuff = tmp;
+				}		
 			}
+			recieveBuff.flip();
+			return UTF8_CHARSET.decode(recieveBuff).toString();
 		}
-		sc.close();
-		recieveBuff.flip();
-		return UTF8_CHARSET.decode(recieveBuff).toString();
 	}
 
 	/**
@@ -100,19 +101,10 @@ public class ClientEOS {
 	static boolean readFully(SocketChannel sc, ByteBuffer bb) throws IOException {
 		Objects.requireNonNull(bb);
 		Objects.requireNonNull(sc);
-		while(true) {
+		while(bb.hasRemaining()){
 			if(sc.read(bb) == -1) {
 				return false;
 			};
-			if (!bb.hasRemaining()) {
-				
-				currentBuffSize *= 2;
-				ByteBuffer tmp = ByteBuffer.allocate(currentBuffSize);
-				recieveBuff.flip();
-				tmp.put(recieveBuff);
-				recieveBuff = tmp;
-			}
-			
 		}
 		return true;
 	}
