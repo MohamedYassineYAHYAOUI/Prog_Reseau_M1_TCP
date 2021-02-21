@@ -1,5 +1,6 @@
 package fr.upem.net.tcp.http;
 
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URL;
@@ -9,6 +10,7 @@ import java.nio.channels.UnresolvedAddressException;
 import java.nio.charset.Charset;
 import java.util.Objects;
 import java.util.logging.Logger;
+
 
 public class HTTPClient {
 
@@ -65,7 +67,11 @@ public class HTTPClient {
 				int contentLength = header.getContentLength();
 				ByteBuffer content = httpReader.readBytes(contentLength);
 				content.flip();
-				//return header.getCharset().decode(content).toString();
+				
+				var cs = header.getCharset();
+				if( cs != null) {
+					return cs.decode(content).toString();
+				}
 				return Charset.forName("UTF8").decode(content).toString();
 			}
 		}
@@ -85,7 +91,6 @@ public class HTTPClient {
 			usage();
 			return;
 		}
-
 		String host = args[0];
 		String ressources = args[1];
 

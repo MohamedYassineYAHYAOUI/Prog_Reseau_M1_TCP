@@ -30,18 +30,22 @@ public class OnDemandConcurrentLongSumServer {
 		logger.info("Server started");
 		while (!Thread.interrupted()) {
 			SocketChannel client = serverSocketChannel.accept();
-			try {
-				logger.info("Connection accepted from " + client.getRemoteAddress());
-				serve(client);
+			logger.info("Connection accepted from " + client.getRemoteAddress());
 
-			} catch (IOException ioe) {
-				logger.log(Level.INFO, "Connection terminated with client by IOException", ioe.getCause());
-			} catch (InterruptedException ie) {
-				logger.info("Server interrupted");
-				break;
-			} finally {
-				silentlyClose(client);
-			}
+			new Thread(() -> {
+				try {
+					serve(client);
+				} catch (InterruptedException e) {
+					logger.info("Server interrupted"+ e.getMessage());
+					return;
+				} catch (IOException e) {
+					logger.log(Level.INFO, "Connection terminated with client by IOException", e.getCause());
+					return;
+				} finally {
+					silentlyClose(client);
+				}
+			}).start();
+
 		}
 	}
 
@@ -52,41 +56,34 @@ public class OnDemandConcurrentLongSumServer {
 	 * @throws IOException
 	 * @throws InterruptedException
 	 */
-	private void serve(SocketChannel sc) throws IOException, InterruptedException {
-		new Thread(() -> {
-			try {
-				while (!Thread.interrupted()) {
-					ByteBuffer buff = ByteBuffer.allocate(Integer.BYTES);
-					if (!readFully(sc, buff)) {
-						logger.info("Client closed the connection");
-						return;
-					}
-					buff.flip();
-					int nbOperand = buff.getInt();
-					int readOperand = 0;
-					long sum = 0;
-					buff = ByteBuffer.allocate(Long.BYTES * nbOperand);
-					if(!readFully(sc, buff)) {
-						logger.log(Level.WARNING, "Client request not valide, closed connection");
-						return;
-					}
-					buff.flip();
-					while (readOperand < nbOperand) {
-						sum += buff.getLong();
-						readOperand++;
-					}
-					buff.clear();
-					buff.limit(Long.BYTES);
-					buff.putLong(sum);
-					buff.flip();
-					sc.write(buff);
-				}
-			}catch(IOException e) {
-				logger.log(Level.SEVERE, "error in thread, shutting down connection with client");
+	private void serve(SocketChannel sc) throws InterruptedException, IOException {
+
+		while (!Thread.interrupted()) {
+			ByteBuffer buff = ByteBuffer.allocate(Integer.BYTES);
+			if (!readFully(sc, buff)) {
+				logger.info("Client closed the connection");
 				return;
 			}
-		}).start();
-		;
+			buff.flip();
+			int nbOperand = buff.getInt();
+			int readOperand = 0;
+			long sum = 0;
+			buff = ByteBuffer.allocate(Long.BYTES * nbOperand);
+			if (!readFully(sc, buff)) {
+				logger.log(Level.WARNING, "Client request not valide, closed connection");
+				return;
+			}
+			buff.flip();
+			while (readOperand < nbOperand) {
+				sum += buff.getLong();
+				readOperand++;
+			}
+			buff.clear();
+			buff.limit(Long.BYTES);
+			buff.putLong(sum);
+			buff.flip();
+			sc.write(buff);
+		}
 
 	}
 
