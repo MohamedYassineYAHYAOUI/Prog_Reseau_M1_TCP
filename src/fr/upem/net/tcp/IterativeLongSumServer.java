@@ -53,7 +53,7 @@ public class IterativeLongSumServer {
      * @throws IOException
      * @throws InterruptedException
      */
-    private void serve(SocketChannel sc) throws IOException, InterruptedException{
+    private void serve_naive(SocketChannel sc) throws IOException, InterruptedException{
    	
     	while(true) {
         	ByteBuffer buff = ByteBuffer.allocate(Integer.BYTES);
@@ -82,6 +82,61 @@ public class IterativeLongSumServer {
         	sc.write(buff);
     	}
 	 }
+    
+    
+    
+    private void serve(SocketChannel sc) throws IOException, InterruptedException{
+    	ByteBuffer buffIn = ByteBuffer.allocate(BUFFER_SIZE).flip();
+    	ByteBuffer buffOut = ByteBuffer.allocate(Long.BYTES);
+    	while(true) {
+    		
+    		if(!ensure(sc, buffIn, Integer.BYTES)) {
+	    		logger.info("connection closed");
+	    		return;
+	    	}
+	    	int nbOperand = buffIn.getInt();
+	    	long sum = 0;
+	    	while(nbOperand > 0 && ensure(sc, buffIn, Long.BYTES)) {
+	    		sum+= buffIn.getLong();
+	    		nbOperand --;
+	    	}
+	    	if(nbOperand !=0) {
+	    		return;
+	    	}
+	    	buffOut.clear();
+	    	buffOut.putLong(sum).flip();
+	    	sc.write(buffOut);
+    	}
+    	
+    }
+    
+    
+    
+    /**
+     * bb in read mode, reads at least byteSize from sc to the buffer
+     * byteSize must be less then bb capacity 
+     * @param sc
+     * @param bb
+     * @param byteSize
+     * @return
+     * @throws IOException
+     */
+   private boolean ensure(SocketChannel sc, ByteBuffer bb, int byteSize) throws IOException {
+	   assert(byteSize<= bb.capacity());
+	   while(bb.remaining() < byteSize) {
+		   bb.compact();
+		   try {
+			   if( sc.read(bb) == -1) {
+				   logger.info("Input stream closed");
+				   return false;
+			   }
+		   }finally {
+			   bb.flip();
+		   }
+	   }
+	   return true;
+   }
+    
 
     /**
      * Close a SocketChannel while ignoring IOExecption
