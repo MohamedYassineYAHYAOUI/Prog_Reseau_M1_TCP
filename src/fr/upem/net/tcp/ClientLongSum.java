@@ -76,7 +76,7 @@ public class ClientLongSum {
 
 	public static void main(String[] args) throws IOException {
 		InetSocketAddress server = new InetSocketAddress(args[0], Integer.valueOf(args[1]));
-		try (SocketChannel sc = SocketChannel.open(server)) {
+		try (SocketChannel sc = SocketChannel.open(server)) { //SA
 			for (int i = 0; i < 5; i++) {
 				ArrayList<Long> list = randomLongList(50);
 

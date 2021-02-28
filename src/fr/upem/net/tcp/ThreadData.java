@@ -16,7 +16,15 @@ public class ThreadData {
 	}
 
 	SocketChannel getSocketChannel() {
-		return sc;
+		synchronized (token) {
+			return sc;
+		}
+	}
+	
+	boolean isConnected() {
+		synchronized (token) {
+			return sc != null && sc.isConnected();
+		}
 	}
 	
 	void setSocketChannel(SocketChannel client) {

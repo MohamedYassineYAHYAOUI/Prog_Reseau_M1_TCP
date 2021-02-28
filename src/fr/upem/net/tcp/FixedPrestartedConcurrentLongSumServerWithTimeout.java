@@ -8,25 +8,25 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.IntStream;
 
-
 public class FixedPrestartedConcurrentLongSumServerWithTimeout {
 
-	private static final Logger logger = Logger.getLogger(FixedPrestartedConcurrentLongSumServerWithTimeout.class.getName());
+	private static final Logger logger = Logger
+			.getLogger(FixedPrestartedConcurrentLongSumServerWithTimeout.class.getName());
 	private static final int BUFFER_SIZE = 1024;
-	private static final int TIME_OUT = 2000 ;
+	private static final int TIME_OUT = 6000;
 	private final int nbThreads;
 	private final ServerSocketChannel serverSocketChannel;
-	private final List<ThreadData> threadDataList; 
+	private final List<ThreadData> threadDataList;
 
 	public FixedPrestartedConcurrentLongSumServerWithTimeout(int port, int maxClient) throws IOException {
 		serverSocketChannel = ServerSocketChannel.open();
 		serverSocketChannel.bind(new InetSocketAddress(port));
-		//threadData = new ThreadData[maxClient];
-		threadDataList= new ArrayList<ThreadData>();
+		threadDataList = new ArrayList<ThreadData>();
 		nbThreads = maxClient;
 		logger.info(this.getClass().getName() + " starts on port " + port);
 	}
@@ -54,9 +54,9 @@ public class FixedPrestartedConcurrentLongSumServerWithTimeout {
 	public void launch() throws IOException {
 		logger.info("Server started");
 		controleThread();
-		IntStream.range(0, nbThreads).forEach(i->{
+		IntStream.range(0, nbThreads).forEach(i -> {
 			new Thread(() -> {
-				
+
 				try {
 					var th = new ThreadData();
 					threadDataList.add(th);
@@ -110,7 +110,7 @@ public class FixedPrestartedConcurrentLongSumServerWithTimeout {
 			buff.limit(Long.BYTES);
 			buff.putLong(sum);
 			buff.flip();
-			
+
 			threadData.getSocketChannel().write(buff);
 		}
 
@@ -144,22 +144,51 @@ public class FixedPrestartedConcurrentLongSumServerWithTimeout {
 		threadData.tick();
 		return true;
 	}
-	
-	
+
 	void controleThread() {
-		new Thread(()->{
+		new Thread(() -> {
 			try {
-				while(!Thread.interrupted()) {
+				while (!Thread.interrupted()) {
 					for (var threadData : threadDataList) {
 						threadData.closeIfInactive(TIME_OUT);
 					}
 					Thread.sleep(TIME_OUT);
 				}
-			}catch(InterruptedException e) {
+			} catch (InterruptedException e) {
 				logger.log(Level.SEVERE, "thread interrupted");
 				return;
 			}
 		}).start();
+	}
+
+	void serverConsol() {
+		try (var scanner = new Scanner(System.in)) {
+			while (scanner.hasNextLine()) {
+				var line = scanner.nextLine();
+				switch (line) {
+				case "INFO":
+					System.out.println("number of connected clients :"
+							+ threadDataList.stream().filter(th ->th.isConnected()).count());
+					break;
+				case "SHUTDOWN":
+					logger.info("shuting down server on safe mode");
+					serverSocketChannel.close();
+					break;
+				case "SHUTDOWNNOW":
+					logger.info("force shut down of the server");
+					for (var threadData : threadDataList) {
+						threadData.close();
+					}
+					break;
+				default:
+					System.out.println("must be INFO, SHUTDOWN or SHUTDOWNNOW");
+					break;
+				}
+			}
+		} catch (IOException e) {
+			logger.log(Level.SEVERE ,"error while shutting down the server "+e.getMessage());
+		}
+
 	}
 
 	static public void usage() {
@@ -172,9 +201,12 @@ public class FixedPrestartedConcurrentLongSumServerWithTimeout {
 			usage();
 			return;
 		}
-		var server = new FixedPrestartedConcurrentLongSumServerWithTimeout(Integer.parseInt(args[0]), Integer.parseInt(args[1]));
-		
+		var server = new FixedPrestartedConcurrentLongSumServerWithTimeout(Integer.parseInt(args[0]),
+				Integer.parseInt(args[1]));
+
 		server.launch();
+
+		server.serverConsol();
 
 	}
 }

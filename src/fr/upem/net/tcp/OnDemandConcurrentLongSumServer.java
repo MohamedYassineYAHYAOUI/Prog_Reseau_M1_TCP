@@ -45,7 +45,6 @@ public class OnDemandConcurrentLongSumServer {
 					silentlyClose(client);
 				}
 			}).start();
-
 		}
 	}
 
