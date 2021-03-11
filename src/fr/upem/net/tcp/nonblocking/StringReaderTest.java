@@ -55,6 +55,7 @@ public class StringReaderTest {
         var bbSmall = ByteBuffer.allocate(2);
         var sr = new StringReader();
         while (bb.hasRemaining()) {
+        	
             while(bb.hasRemaining() && bbSmall.hasRemaining()){
                 bbSmall.put(bb.get());
             }
@@ -63,6 +64,7 @@ public class StringReaderTest {
             } else {
                 assertEquals(Reader.ProcessStatus.DONE,sr.process(bbSmall));
             }
+
         }
         assertEquals(string,sr.get());
     }

@@ -14,7 +14,7 @@ public class IntReader implements Reader<Integer> {
 
     @Override
     public ProcessStatus process(ByteBuffer bb) {
-        if (state== State.DONE || state== State.ERROR) {
+        if (state== State.DONE || state== State.ERROR){
             throw new IllegalStateException();
         }
         bb.flip();
