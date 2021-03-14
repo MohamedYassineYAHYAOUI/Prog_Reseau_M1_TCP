@@ -5,9 +5,11 @@ import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.logging.Logger;
 
 public class StringReader implements Reader<String> {
     private enum State {DONE, WAITING_FOR_SIZE, WAITING_FOR_CONTENT, ERROR};
+	static private Logger logger = Logger.getLogger(StringReader.class.getName());
     private final int MAX_SIZE = 1_024;
     private static final Charset UTF8 = StandardCharsets.UTF_8;
     private final IntReader intReader = new IntReader();
@@ -29,7 +31,7 @@ public class StringReader implements Reader<String> {
             	if(size < 0 || size > 1024) {
             		return ProcessStatus.ERROR;
             	}
-                reset();
+            	//reset();
                 state = State.WAITING_FOR_CONTENT;
             case WAITING_FOR_CONTENT:
                 var missing = size -internalbb.position();
@@ -48,9 +50,9 @@ public class StringReader implements Reader<String> {
                 	state=State.DONE;
                 	internalbb.flip();
                 	value = UTF8.decode(internalbb).toString();
+                	internalbb.compact();
                 	return ProcessStatus.DONE;
                 }
-               
             default:
                 throw new IllegalStateException();
         }
@@ -63,6 +65,7 @@ public class StringReader implements Reader<String> {
         if (state != State.DONE) {
             throw new IllegalStateException();
         }
+        
         return value;
     }
 

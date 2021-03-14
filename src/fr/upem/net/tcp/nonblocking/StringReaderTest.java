@@ -19,7 +19,9 @@ public class StringReaderTest {
         var bytes = StandardCharsets.UTF_8.encode(string);
         bb.putInt(bytes.remaining()).put(bytes);
         StringReader sr = new StringReader();
+        System.out.println("test");
         assertEquals(Reader.ProcessStatus.DONE,sr.process(bb));
+        
         assertEquals(string,sr.get());
         assertEquals(0,bb.position());
         assertEquals(bb.capacity(),bb.limit());
