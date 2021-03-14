@@ -1,87 +1,76 @@
 package fr.upem.net.tcp.nonblocking;
 
+
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
-
 public class StringReader implements Reader<String> {
-
-    private enum State {DONE,WAITING_FOR_SIZE,WAITING_FOR_TEXT,ERROR};
-    private static int TEXT_MAX_SIZE = 1024;  
-    private static Charset UTF8 = StandardCharsets.UTF_8;
-    
-    private State state = State.WAITING_FOR_SIZE;
-    
-    private final ByteBuffer internalbb = ByteBuffer.allocate(TEXT_MAX_SIZE); // write-mode
-    private String text;
-    private int textSize;
-    private int bytesRead;
+    private enum State {DONE, WAITING_FOR_SIZE, WAITING_FOR_CONTENT, ERROR};
+    private final int MAX_SIZE = 1_024;
+    private static final Charset UTF8 = StandardCharsets.UTF_8;
     private final IntReader intReader = new IntReader();
+    private final ByteBuffer internalbb = ByteBuffer.allocate(MAX_SIZE);
+    private State state = State.WAITING_FOR_SIZE;
+    private int size;
+    private String value;
 
-    
-    /**
-     * extracts the size from the buffer and compare to TEXT_MAX_SIZE
-     * @param bb buffer in read mode
-     * @return size
-     */
-    
-    private int extractSize(ByteBuffer bb) {
-    	int size =0;
-    	if(bb.limit() >= Integer.BYTES) {
-    		size = bb.getInt();
-    		if( size > TEXT_MAX_SIZE || size < 0) {
-    			throw new IllegalStateException(); 
-    		}
-    	}
-    	return size;
-    }
- 
+
+    @Override
     public ProcessStatus process(ByteBuffer bb) {
-        if (state== State.DONE || state== State.ERROR) {
-            throw new IllegalStateException();
-        }
-        bb.flip();
-        try {
-            if(state == State.WAITING_FOR_SIZE) {
-                textSize = extractSize(bb);
-                state= State.WAITING_FOR_TEXT;
-            }
-            if(state == State.WAITING_FOR_TEXT){
-                while(bb.hasRemaining() && internalbb.hasRemaining() && internalbb.position() <textSize ) {
-                    internalbb.put(bb.get());
+        switch (state) {
+            case WAITING_FOR_SIZE:
+                var status = intReader.process(bb);
+                if(status == ProcessStatus.REFILL) {
+                	return status ;
                 }
-            }
-        }catch(IllegalStateException e){
-            return ProcessStatus.ERROR;
-        }finally {
-            bb.compact();
+                size = intReader.get();
+            	if(size < 0 || size > 1024) {
+            		return ProcessStatus.ERROR;
+            	}
+                reset();
+                state = State.WAITING_FOR_CONTENT;
+            case WAITING_FOR_CONTENT:
+                var missing = size -internalbb.position();
+                try {
+                	bb.flip();
+                	while(internalbb.hasRemaining() && missing > 0) {
+                		internalbb.put(bb.get());
+                		missing--;
+                	}
+                }catch(BufferUnderflowException e){
+                	return ProcessStatus.REFILL;
+                }finally {
+                	bb.compact();
+                }
+                if(missing == 0){
+                	state=State.DONE;
+                	internalbb.flip();
+                	value = UTF8.decode(internalbb).toString();
+                	return ProcessStatus.DONE;
+                }
+               
+            default:
+                throw new IllegalStateException();
         }
-        if (internalbb.position() < textSize){
-            return ProcessStatus.REFILL;
-        }
-        state=State.DONE;
-        internalbb.flip();
-        text = UTF8.decode(internalbb).toString();
-        return ProcessStatus.DONE;
     }
-	
 
+   
 
-	@Override
-	public String get() {
-        if (state!= State.DONE) {
+    @Override
+    public String get() {
+        if (state != State.DONE) {
             throw new IllegalStateException();
         }
-        return text;
-	}
+        return value;
+    }
 
-	@Override
-	public void reset() {
-        state= State.WAITING_FOR_SIZE;
+    @Override
+    public void reset() {
+        state = State.WAITING_FOR_SIZE;
+        intReader.reset();
         internalbb.clear();
-        textSize = 0;
-        
-	}
-
+        value = null;
+    }
 }
