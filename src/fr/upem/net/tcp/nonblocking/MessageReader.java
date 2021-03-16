@@ -60,7 +60,7 @@ public class MessageReader implements Reader<Message> {
 		stringReader.reset();
 		message= null;
 		readLogIn = false;
-		readLogIn = false;
+		readMsg = false;
 	}
 
 }
